@@ -1,7 +1,33 @@
 # nom-parsable
-This is an extension to the popular nom crate, that provides a `Parsable` trait that can be implemented on any data that 
-can be parsed. This means it should have a `parse` function available. It also provides a `parsable` macro that 
-generates this trait implementation with many sensible defaults.
+
+This is an extension to the popular nom crate, that provides a `ParseFrom` 
+trait that can be implemented on any data that can be parsed in a singular way.
+This means it should have a `parse` function available and the signature of
+that function is compatible with the `nom::Parser` trait.
+
+## Default implementations
+
+### Primitive numbers
+It provides a `ParseFrom` implementation for a couple of primitive types:
+
+- `i16`
+- `i32`
+- `i64`
+- `i128`
+- `u16`
+- `u32`
+- `u64`
+- `u128`
+
+### `Vec<T>`
+A default implementation for Vec<T> has been provided, as long as T implements 
+`ParseFrom`, where it uses the `nom::character::complete::line_ending` parser
+to separate the elements.
+
+Since it's not possible to implement `ParseFrom` for `Vec<T>` outside of this
+library, this is the choice that has been made for separating items. If you
+want you're own implementation, wrap the `Vec<T>` in a struct and implement
+`ParseFrom` for that struct.
 
 ## License
 

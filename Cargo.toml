@@ -1,0 +1,33 @@
+[package]
+name = "nom-parse-trait"
+description = "Adding traits to make parsing types easier"
+version = "0.1.0"
+license = "MIT/Apache-2.0"
+keywords = ["nom", "parser", "parsable"]
+categories = ["parsing"]
+authors = ["Marc de Jonge <marcdejonge@gmail.com>"]
+homepage = "https://github.com/marcdejonge/nom-parsable"
+repository = "https://github.com/marcdejonge/nom-parsable.git"
+readme = "README.md"
+edition = "2021"
+
+include = [
+    "src/*.rs",
+    "LICENSE-*",
+    "README.md",
+]
+
+[features]
+default = ["bytes"]
+bytes = []
+chars = []
+
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "simple"
+path = "examples/simple.rs"
+
+[dependencies]
+nom = "7.1.3"

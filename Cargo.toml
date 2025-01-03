@@ -17,17 +17,16 @@ include = [
     "README.md",
 ]
 
-[features]
-default = ["bytes"]
-bytes = []
-chars = []
-
 [lib]
 path = "src/lib.rs"
 
 [[example]]
 name = "simple"
 path = "examples/simple.rs"
+
+[[example]]
+name = "generic_input"
+path = "examples/generic_input.rs"
 
 [dependencies]
 nom = "7.1.3"

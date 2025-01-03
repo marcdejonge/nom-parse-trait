@@ -1,5 +1,6 @@
 use nom::*;
 use std::ops::*;
+use nom::error::ParseError;
 
 /// #nom-parsable
 ///
@@ -16,7 +17,7 @@ where
 }
 
 /// An extension for the ParseFrom trait with extra functionality to make parse a bit easier.
-trait ParseFromExt<I, E>
+pub trait ParseFromExt<I, E>
 where
     Self: Sized,
 {
@@ -45,46 +46,63 @@ where
     }
 }
 
-macro_rules! parse_trait_impl {
-    ($ty:ty => $function:path) => {
-        /// Default implementation of the ParseFrom trait for $ty.
+macro_rules! unsigned_parsable {
+    ($($ty:tt)+) => {
+        $(
         impl<I, E: error::ParseError<I>> ParseFrom<I, E> for $ty
         where
-            I: Clone
-                + nom::AsBytes
-                + nom::InputLength
-                + nom::InputTake
-                + nom::Offset
-                + nom::Slice<std::ops::RangeFrom<usize>>
-                + nom::Slice<std::ops::Range<usize>>
-                + nom::Slice<std::ops::RangeTo<usize>>
-                + for<'a> nom::Compare<&'a [u8]>
-                + nom::InputIter
-                + nom::InputTakeAtPosition,
-            <I as nom::InputIter>::Item: AsChar + Copy,
-            <I as nom::InputIter>::IterElem: Clone,
-            <I as nom::InputTakeAtPosition>::Item: AsChar + Clone,
+            I: InputIter + Slice<RangeFrom<usize>> + InputLength,
+            <I as InputIter>::Item: AsChar,
         {
             fn parse(input: I) -> nom::IResult<I, $ty, E> {
-                $function(input)
+                nom::character::complete::$ty(input)
             }
         }
-    };
-}
-
-macro_rules! primitive_parsable {
-    ($($ty:tt)+) => {
-        $( parse_trait_impl!($ty => character::complete::$ty); )*
+        )*
     }
 }
 
-primitive_parsable!(u16 u32 u64 u128);
-primitive_parsable!(i16 i32 i64 i128);
+unsigned_parsable!(u16 u32 u64 u128);
 
-impl<I, E, T: ParseFrom<I, E>> ParseFrom<I, E> for Vec<T>
+macro_rules! signed_parsable {
+    ($($ty:tt)+) => {
+        $(
+        impl<I, E: error::ParseError<I>> ParseFrom<I, E> for $ty
+        where
+            I: InputIter + Slice<RangeFrom<usize>> + InputLength + InputTake + Clone,
+            <I as InputIter>::Item: AsChar,
+            I: for <'a> Compare<&'a[u8]>,
+        {
+            fn parse(input: I) -> nom::IResult<I, $ty, E> {
+                nom::character::complete::$ty(input)
+            }
+        }
+        )*
+    }
+}
+
+signed_parsable!(i16 i32 i64 i128);
+
+impl<I, E: ParseError<I>> ParseFrom<I, E> for bool
 where
-    E: error::ParseError<I>,
+    // From alt
+    I: Clone,
+    // From tag
+    I: InputTake + Compare<&'static str>,
+{
+    fn parse(input: I) -> IResult<I, Self, E> {
+        branch::alt((
+            combinator::value(true, bytes::complete::tag("true")),
+            combinator::value(false, bytes::complete::tag("false")),
+        )).parse(input)
+    }
+}
+
+impl<I, E: ParseError<I>, T: ParseFrom<I, E>> ParseFrom<I, E> for Vec<T>
+where
+    // From separated_list0
     I: Clone + InputLength,
+    // From line_ending
     I: Slice<Range<usize>> + Slice<RangeFrom<usize>> + Slice<RangeTo<usize>>,
     I: InputIter + InputLength,
     I: Compare<&'static str>,

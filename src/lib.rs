@@ -1,6 +1,5 @@
 use nom::*;
 use std::ops::*;
-use nom::error::ParseError;
 
 /// #nom-parsable
 ///
@@ -83,7 +82,7 @@ macro_rules! signed_parsable {
 
 signed_parsable!(i16 i32 i64 i128);
 
-impl<I, E: ParseError<I>> ParseFrom<I, E> for bool
+impl<I, E: error::ParseError<I>> ParseFrom<I, E> for bool
 where
     // From alt
     I: Clone,
@@ -94,11 +93,12 @@ where
         branch::alt((
             combinator::value(true, bytes::complete::tag("true")),
             combinator::value(false, bytes::complete::tag("false")),
-        )).parse(input)
+        ))
+        .parse(input)
     }
 }
 
-impl<I, E: ParseError<I>, T: ParseFrom<I, E>> ParseFrom<I, E> for Vec<T>
+impl<I, E: error::ParseError<I>, T: ParseFrom<I, E>> ParseFrom<I, E> for Vec<T>
 where
     // From separated_list0
     I: Clone + InputLength,

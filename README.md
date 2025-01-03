@@ -1,5 +1,7 @@
 # nom-parsable
 
+[![CI](https://github.com/marcdejonge/nom-parse-trait/actions/workflows/ci.yml/badge.svg)](https://github.com/marcdejonge/nom-parse-trait/actions/workflows/ci.yml)
+
 This is an extension to the popular nom crate, that provides a `ParseFrom` 
 trait that can be implemented on any data that can be parsed in a singular way.
 This means it should have a `parse` function available and the signature of

@@ -6,8 +6,8 @@ license = "MIT/Apache-2.0"
 keywords = ["nom", "parser", "parsable"]
 categories = ["parsing"]
 authors = ["Marc de Jonge <marcdejonge@gmail.com>"]
-homepage = "https://github.com/marcdejonge/nom-parsable"
-repository = "https://github.com/marcdejonge/nom-parsable.git"
+homepage = "https://github.com/marcdejonge/nom-parse-trait"
+repository = "https://github.com/marcdejonge/nom-parse-trait.git"
 readme = "README.md"
 edition = "2021"
 

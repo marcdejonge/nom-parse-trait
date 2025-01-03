@@ -1,10 +1,7 @@
 use nom::character::complete::space1;
 use nom::combinator::map;
 use nom::multi::separated_list1;
-use nom::{
-    IResult,
-    Parser,
-};
+use nom::{IResult, Parser};
 use nom_parse_trait::{ParseFrom, ParseFromExt};
 
 struct Numbers(Vec<u32>);

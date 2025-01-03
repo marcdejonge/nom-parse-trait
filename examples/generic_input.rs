@@ -1,8 +1,8 @@
 use nom::character::complete::space1;
 use nom::combinator::map;
+use nom::error::{Error, ParseError};
 use nom::multi::separated_list1;
 use nom::*;
-use nom::error::{Error, ParseError};
 use nom_parse_trait::{ParseFrom, ParseFromExt};
 
 struct Numbers(Vec<u32>);

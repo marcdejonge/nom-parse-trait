@@ -1,6 +1,8 @@
-# nom-parsable
+# nom-parse-trait
 
 [![CI](https://github.com/marcdejonge/nom-parse-trait/actions/workflows/ci.yml/badge.svg)](https://github.com/marcdejonge/nom-parse-trait/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/nom-parse-trait.svg)](https://crates.io/crates/nom-parse-trait)
+[![Documentation](https://docs.rs/nom-parse-trait/badge.svg)](https://docs.rs/nom-parse-trait)
 
 This is an extension to the popular nom crate, that provides a `ParseFrom` 
 trait that can be implemented on any data that can be parsed in a singular way.

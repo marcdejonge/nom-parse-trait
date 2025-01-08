@@ -1,9 +1,35 @@
-use nom::*;
-use std::ops::*;
+//! #nom-parse-trait
+//!
+//! This is an extension to the popular nom crate, that provides a `ParseFrom`
+//! trait that can be implemented on any data that can be parsed in a singular way.
+//! This means it should have a `parse` function available and the signature of
+//! that function is compatible with the `nom::Parser` trait.
+//!
+//! The main usage of this is to easily combine parsers of different types.
+//! To see the real power of this trait, take a look at he nom-parse-macros trait,
+//! which makes it possible easily implement this trait on data types.
+//!
+//! ## Generic vs Specific parsers
+//!
+//! The `ParseFrom` trait is generic over the input type, which means that you can
+//! define it generically over any input type that nom supports. The downside of this
+//! is that you will need a bunch of restrictions to the input type in a `where` block.
+//! Also, using a generic parser implementation can be more annoying to use, since in
+//! some cases Rust can't infer the type of the input or error. See the
+//! [generic_input](examples/generic_input.rs) example for an example of this.
+//!
+//! If you already know what types of input and error you are going to use in the program,
+//! using a specific implementation can be more convenient. See the [simple](examples/simple.rs)
+//! example for an example of this.
 
-/// #nom-parsable
-///
-///
+use branch::alt;
+use combinator::value;
+use nom::bytes::complete::tag;
+use nom::character::complete::space0;
+use nom::*;
+use std::collections::{HashMap, HashSet};
+use std::hash::{BuildHasher, Hash};
+use std::ops::*;
 
 /// A trait for types that can be parsed from the given input.
 pub trait ParseFrom<I, E = error::Error<I>>
@@ -80,8 +106,9 @@ macro_rules! signed_parsable {
     }
 }
 
-signed_parsable!(i16 i32 i64 i128);
+signed_parsable!(i8 i16 i32 i64 i128);
 
+/// Support reading the words "true" or "false" from the input and interpreting them as boolean values.
 impl<I, E: error::ParseError<I>> ParseFrom<I, E> for bool
 where
     // From alt
@@ -90,14 +117,53 @@ where
     I: InputTake + Compare<&'static str>,
 {
     fn parse(input: I) -> IResult<I, Self, E> {
-        branch::alt((
-            combinator::value(true, bytes::complete::tag("true")),
-            combinator::value(false, bytes::complete::tag("false")),
-        ))
-        .parse(input)
+        alt((value(true, tag("true")), value(false, tag("false")))).parse(input)
     }
 }
 
+/// Support reading a single character from the input.
+impl<I, E: error::ParseError<I>> ParseFrom<I, E> for char
+where
+    I: Clone + InputTake + InputLength + InputIter,
+    <I as InputIter>::Item: AsChar,
+{
+    fn parse(input: I) -> IResult<I, Self, E> {
+        if input.input_len() == 0 {
+            return Err(Err::Error(E::from_error_kind(input, error::ErrorKind::Eof)));
+        }
+
+        let char = input.iter_elements().next().unwrap().as_char();
+        let (rest, _) = input.take_split(char.len());
+        Ok((rest, char))
+    }
+}
+
+/// Support reading a single byte from the input. This is NOT a parsed number, but the raw byte value.
+impl<I, E: error::ParseError<I>> ParseFrom<I, E> for u8
+where
+    I: Clone + InputTake + InputLength + InputIter,
+    <I as InputIter>::Item: AsChar,
+{
+    fn parse(input: I) -> IResult<I, Self, E> {
+        if input.input_len() == 0 {
+            return Err(Err::Error(E::from_error_kind(input, error::ErrorKind::Eof)));
+        }
+
+        let char = input.iter_elements().next().unwrap().as_char();
+        if char.len() != 1 {
+            return Err(Err::Error(E::from_error_kind(
+                input,
+                error::ErrorKind::Char,
+            )));
+        }
+
+        let (rest, _) = input.take_split(1);
+        Ok((rest, char as u8))
+    }
+}
+
+/// Support parsing a vector of ParseFrom types from the input. This uses the line_ending parser
+/// to separate the items.
 impl<I, E: error::ParseError<I>, T: ParseFrom<I, E>> ParseFrom<I, E> for Vec<T>
 where
     // From separated_list0
@@ -109,6 +175,57 @@ where
 {
     fn parse(input: I) -> IResult<I, Self, E> {
         multi::separated_list0(character::complete::line_ending, T::parse).parse(input)
+    }
+}
+
+/// Support parsing a HashSet of ParseFrom types from the input. This uses the line_ending parser
+/// to separate the items.
+impl<I, E: error::ParseError<I>, T: ParseFrom<I, E>, S> ParseFrom<I, E> for HashSet<T, S>
+where
+    // From separated_list0
+    I: Clone + InputLength,
+    // From line_ending
+    I: Slice<Range<usize>> + Slice<RangeFrom<usize>> + Slice<RangeTo<usize>>,
+    I: InputIter + InputLength,
+    I: Compare<&'static str>,
+    T: Eq + Hash,
+    S: BuildHasher + Default,
+{
+    fn parse(input: I) -> IResult<I, Self, E> {
+        combinator::map(
+            multi::separated_list0(character::complete::line_ending, T::parse),
+            |list| list.into_iter().collect(),
+        )
+        .parse(input)
+    }
+}
+
+/// Support parsing a HashMap of ParseFrom types from the input. This uses the line_ending parser
+/// to separate the items and the "=" sign to separate the key and value.
+impl<I, E: error::ParseError<I>, K: ParseFrom<I, E>, V: ParseFrom<I, E>, S> ParseFrom<I, E>
+    for HashMap<K, V, S>
+where
+    I: Slice<Range<usize>> + Slice<RangeFrom<usize>> + Slice<RangeTo<usize>>,
+    I: Clone + InputIter + InputTakeAtPosition + InputLength + InputTake,
+    <I as InputIter>::Item: AsChar + Copy,
+    <I as InputTakeAtPosition>::Item: AsChar + Clone,
+    I: Compare<&'static str>,
+    K: Eq + Hash,
+    S: BuildHasher + Default,
+{
+    fn parse(input: I) -> IResult<I, Self, E> {
+        combinator::map(
+            multi::separated_list0(
+                character::complete::line_ending,
+                sequence::separated_pair(
+                    K::parse,
+                    sequence::tuple((space0, tag("="), space0)),
+                    V::parse,
+                ),
+            ),
+            |list| list.into_iter().collect(),
+        )
+        .parse(input)
     }
 }
 
@@ -151,18 +268,66 @@ mod tests {
     test_unsigned!(u16 u32 u64 u128);
     test_unsigned!(i16 i32 i64 i128);
 
-    mod vec {
+    mod char {
+        use crate::*;
+        use nom::error::*;
+        use nom::multi::many1;
+
+        #[test]
+        fn read_characters() {
+            let input = "TðŒ🏃";
+
+            let result: Result<_, Error<_>> = many1(char::parse)(input).finish();
+
+            assert_eq!(Ok(("", vec!['T', 'ð', 'Œ', '🏃'])), result);
+        }
+
+        #[test]
+        fn read_bytes() {
+            let input = b"1234".as_ref();
+
+            let result: Result<_, Error<_>> = many1(char::parse)(input).finish();
+
+            assert_eq!(Ok((b"".as_ref(), vec!['1', '2', '3', '4'])), result);
+        }
+    }
+
+    mod collections {
         use crate::*;
         use nom::error::*;
 
         #[test]
-        fn test_list_of_numbers() {
+        fn test_vec_of_numbers() {
             let input = "1\n2\n3\n4\n5";
             let expected = vec![1, 2, 3, 4, 5];
 
             assert_eq!(
                 Ok::<_, Error<_>>(expected),
                 Vec::<u32>::parse_complete(input)
+            );
+        }
+
+        #[test]
+        fn test_set_of_numbers() {
+            let input = "1\n2\n3\n4\n5";
+            let expected = vec![1, 2, 3, 4, 5].into_iter().collect();
+
+            assert_eq!(
+                Ok::<_, Error<_>>(expected),
+                HashSet::<u32>::parse_complete(input)
+            );
+        }
+
+        #[test]
+        fn test_map_of_numbers() {
+            let input = "a = 1\nb = 2\nc = 3\nd = 4\ne = 5";
+            let expected = vec![('a', 1), ('b', 2), ('c', 3), ('d', 4), ('e', 5)]
+                .into_iter()
+                .collect();
+
+            assert_eq!(
+                Ok::<_, Error<_>>(expected),
+                HashMap::<char, u32>::parse_complete(input)
             );
         }
     }

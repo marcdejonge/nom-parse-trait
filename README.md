@@ -51,6 +51,14 @@ A default implementation for Vec<T> has been provided, as long as T implements
 `ParseFrom`, where it uses the `nom::character::complete::line_ending` parser
 to separate the elements.
 
+### `HashMap<T, S>`
+Similar to the `Vec<T>` implementation, you can also use a HashSet directly.
+
+### `HashMap<K, V, S>`
+A default implementation for `HashMap<K, V>` has been provided, as long as K and V
+implement `ParseFrom`. It uses the `nom::character::complete::line_ending` parser
+to separate the key-value pairs and separates the key and value with an equals sign (=).
+
 ## License
 
 Licensed under either of

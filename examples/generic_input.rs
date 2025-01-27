@@ -9,14 +9,8 @@ struct Numbers(Vec<u32>);
 
 impl<I, E: ParseError<I>> ParseFrom<I, E> for Numbers
 where
-    // From separated_list1
-    I: Clone + InputLength,
-    // From space1
-    I: InputTakeAtPosition,
-    <I as InputTakeAtPosition>::Item: AsChar + Clone,
-    // From u32::parse
-    I: InputIter + Slice<std::ops::RangeFrom<usize>> + InputLength,
-    <I as InputIter>::Item: AsChar,
+    I: Input,
+    <I as Input>::Item: AsChar,
 {
     fn parse(input: I) -> IResult<I, Self, E> {
         map(separated_list1(space1, u32::parse), |v| Numbers(v)).parse(input)

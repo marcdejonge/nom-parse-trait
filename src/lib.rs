@@ -29,7 +29,6 @@ use nom::character::complete::space0;
 use nom::*;
 use std::collections::{HashMap, HashSet};
 use std::hash::{BuildHasher, Hash};
-use std::ops::*;
 
 /// A trait for types that can be parsed from the given input.
 pub trait ParseFrom<I, E = error::Error<I>>
@@ -51,7 +50,7 @@ where
 
 impl<I, E, T: ParseFrom<I, E>> ParseFromExt<I, E> for T
 where
-    I: InputLength,
+    I: Input,
     E: error::ParseError<I>,
 {
     /// Parse the input and return the result if the input is fully consumed.
@@ -76,8 +75,8 @@ macro_rules! unsigned_parsable {
         $(
         impl<I, E: error::ParseError<I>> ParseFrom<I, E> for $ty
         where
-            I: InputIter + Slice<RangeFrom<usize>> + InputLength,
-            <I as InputIter>::Item: AsChar,
+            I: Input,
+            <I as Input>::Item: AsChar,
         {
             fn parse(input: I) -> nom::IResult<I, $ty, E> {
                 nom::character::complete::$ty(input)
@@ -94,8 +93,8 @@ macro_rules! signed_parsable {
         $(
         impl<I, E: error::ParseError<I>> ParseFrom<I, E> for $ty
         where
-            I: InputIter + Slice<RangeFrom<usize>> + InputLength + InputTake + Clone,
-            <I as InputIter>::Item: AsChar,
+            I: Input,
+            <I as Input>::Item: AsChar,
             I: for <'a> Compare<&'a[u8]>,
         {
             fn parse(input: I) -> nom::IResult<I, $ty, E> {
@@ -111,10 +110,7 @@ signed_parsable!(i8 i16 i32 i64 i128);
 /// Support reading the words "true" or "false" from the input and interpreting them as boolean values.
 impl<I, E: error::ParseError<I>> ParseFrom<I, E> for bool
 where
-    // From alt
-    I: Clone,
-    // From tag
-    I: InputTake + Compare<&'static str>,
+    I: Input + Compare<&'static str>,
 {
     fn parse(input: I) -> IResult<I, Self, E> {
         alt((value(true, tag("true")), value(false, tag("false")))).parse(input)
@@ -124,8 +120,8 @@ where
 /// Support reading a single character from the input.
 impl<I, E: error::ParseError<I>> ParseFrom<I, E> for char
 where
-    I: Clone + InputTake + InputLength + InputIter,
-    <I as InputIter>::Item: AsChar,
+    I: Input,
+    <I as Input>::Item: AsChar,
 {
     fn parse(input: I) -> IResult<I, Self, E> {
         if input.input_len() == 0 {
@@ -141,8 +137,8 @@ where
 /// Support reading a single byte from the input. This is NOT a parsed number, but the raw byte value.
 impl<I, E: error::ParseError<I>> ParseFrom<I, E> for u8
 where
-    I: Clone + InputTake + InputLength + InputIter,
-    <I as InputIter>::Item: AsChar,
+    I: Input,
+    <I as Input>::Item: AsChar,
 {
     fn parse(input: I) -> IResult<I, Self, E> {
         if input.input_len() == 0 {
@@ -166,12 +162,7 @@ where
 /// to separate the items.
 impl<I, E: error::ParseError<I>, T: ParseFrom<I, E>> ParseFrom<I, E> for Vec<T>
 where
-    // From separated_list0
-    I: Clone + InputLength,
-    // From line_ending
-    I: Slice<Range<usize>> + Slice<RangeFrom<usize>> + Slice<RangeTo<usize>>,
-    I: InputIter + InputLength,
-    I: Compare<&'static str>,
+    I: Input + Compare<&'static str>,
 {
     fn parse(input: I) -> IResult<I, Self, E> {
         multi::separated_list0(character::complete::line_ending, T::parse).parse(input)
@@ -182,12 +173,7 @@ where
 /// to separate the items.
 impl<I, E: error::ParseError<I>, T: ParseFrom<I, E>, S> ParseFrom<I, E> for HashSet<T, S>
 where
-    // From separated_list0
-    I: Clone + InputLength,
-    // From line_ending
-    I: Slice<Range<usize>> + Slice<RangeFrom<usize>> + Slice<RangeTo<usize>>,
-    I: InputIter + InputLength,
-    I: Compare<&'static str>,
+    I: Input + Compare<&'static str>,
     T: Eq + Hash,
     S: BuildHasher + Default,
 {
@@ -205,11 +191,8 @@ where
 impl<I, E: error::ParseError<I>, K: ParseFrom<I, E>, V: ParseFrom<I, E>, S> ParseFrom<I, E>
     for HashMap<K, V, S>
 where
-    I: Slice<Range<usize>> + Slice<RangeFrom<usize>> + Slice<RangeTo<usize>>,
-    I: Clone + InputIter + InputTakeAtPosition + InputLength + InputTake,
-    <I as InputIter>::Item: AsChar + Copy,
-    <I as InputTakeAtPosition>::Item: AsChar + Clone,
-    I: Compare<&'static str>,
+    I: Input + Compare<&'static str>,
+    <I as Input>::Item: AsChar + Copy,
     K: Eq + Hash,
     S: BuildHasher + Default,
 {
@@ -217,11 +200,7 @@ where
         combinator::map(
             multi::separated_list0(
                 character::complete::line_ending,
-                sequence::separated_pair(
-                    K::parse,
-                    sequence::tuple((space0, tag("="), space0)),
-                    V::parse,
-                ),
+                sequence::separated_pair(K::parse, (space0, tag("="), space0), V::parse),
             ),
             |list| list.into_iter().collect(),
         )
@@ -277,7 +256,7 @@ mod tests {
         fn read_characters() {
             let input = "TðŒ🏃";
 
-            let result: Result<_, Error<_>> = many1(char::parse)(input).finish();
+            let result: Result<_, Error<_>> = many1(char::parse).parse(input).finish();
 
             assert_eq!(Ok(("", vec!['T', 'ð', 'Œ', '🏃'])), result);
         }
@@ -286,7 +265,7 @@ mod tests {
         fn read_bytes() {
             let input = b"1234".as_ref();
 
-            let result: Result<_, Error<_>> = many1(char::parse)(input).finish();
+            let result: Result<_, Error<_>> = many1(char::parse).parse(input).finish();
 
             assert_eq!(Ok((b"".as_ref(), vec!['1', '2', '3', '4'])), result);
         }

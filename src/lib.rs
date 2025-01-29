@@ -78,7 +78,7 @@ macro_rules! unsigned_parsable {
             I: Input,
             <I as Input>::Item: AsChar,
         {
-            fn parse(input: I) -> nom::IResult<I, $ty, E> {
+            fn parse(input: I) -> nom::IResult<I, Self, E> {
                 nom::character::complete::$ty(input)
             }
         }
@@ -97,7 +97,7 @@ macro_rules! signed_parsable {
             <I as Input>::Item: AsChar,
             I: for <'a> Compare<&'a[u8]>,
         {
-            fn parse(input: I) -> nom::IResult<I, $ty, E> {
+            fn parse(input: I) -> nom::IResult<I, Self, E> {
                 nom::character::complete::$ty(input)
             }
         }
@@ -106,6 +106,26 @@ macro_rules! signed_parsable {
 }
 
 signed_parsable!(i8 i16 i32 i64 i128);
+
+macro_rules! floating_parsable {
+    ($($ty:ty => $fn:tt),+) => {
+        $(
+        impl<I, E: error::ParseError<I>> ParseFrom<I, E> for $ty
+        where
+            I: Input + Offset + AsBytes + ParseTo<$ty> + Compare<&'static str>,
+            <I as Input>::Item: AsChar,
+            <I as Input>::Iter: Clone,
+            I: for<'a> Compare<&'a [u8]>,
+        {
+            fn parse(input: I) -> nom::IResult<I, Self, E> {
+                nom::number::complete::$fn(input)
+            }
+        }
+        )*
+    }
+}
+
+floating_parsable!(f32 => float, f64 => double);
 
 /// Support reading the words "true" or "false" from the input and interpreting them as boolean values.
 impl<I, E: error::ParseError<I>> ParseFrom<I, E> for bool
@@ -246,6 +266,22 @@ mod tests {
 
     test_unsigned!(u16 u32 u64 u128);
     test_unsigned!(i16 i32 i64 i128);
+
+    mod floats {
+        use crate::*;
+
+        #[test]
+        fn parse_f32() {
+            assert_eq!(Ok::<_, ()>(6e8), f32::parse_complete("6e8"));
+            assert_eq!(Ok::<_, ()>(3.14e-2), f32::parse_complete(b"3.14e-2".as_ref()));
+        }
+
+        #[test]
+        fn parse_f64() {
+            assert_eq!(Ok::<_, ()>(6e8), f64::parse_complete("6e8"));
+            assert_eq!(Ok::<_, ()>(3.14e-2), f64::parse_complete(b"3.14e-2".as_ref()));
+        }
+    }
 
     mod char {
         use crate::*;

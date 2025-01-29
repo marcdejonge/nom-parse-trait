@@ -42,9 +42,16 @@ normal text parsing (e.g. the string "123" will be parsed to the number 123).
 - `u32`
 - `u64`
 - `u128`
+- `f32`
+- `f64`
 
 Also, the `bool` type has a default implementation, where it will parse the string
 "true" to `true` and "false" to `false`.
+
+### `u8` and `char`
+
+The `u8` and `char` types have a default implementation, where it will take a single
+byte or character from the input.
 
 ### `Vec<T>`
 A default implementation for Vec<T> has been provided, as long as T implements 

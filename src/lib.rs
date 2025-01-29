@@ -273,13 +273,19 @@ mod tests {
         #[test]
         fn parse_f32() {
             assert_eq!(Ok::<_, ()>(6e8), f32::parse_complete("6e8"));
-            assert_eq!(Ok::<_, ()>(3.14e-2), f32::parse_complete(b"3.14e-2".as_ref()));
+            assert_eq!(
+                Ok::<_, ()>(3.14e-2),
+                f32::parse_complete(b"3.14e-2".as_ref())
+            );
         }
 
         #[test]
         fn parse_f64() {
             assert_eq!(Ok::<_, ()>(6e8), f64::parse_complete("6e8"));
-            assert_eq!(Ok::<_, ()>(3.14e-2), f64::parse_complete(b"3.14e-2".as_ref()));
+            assert_eq!(
+                Ok::<_, ()>(3.14e-2),
+                f64::parse_complete(b"3.14e-2".as_ref())
+            );
         }
     }
 

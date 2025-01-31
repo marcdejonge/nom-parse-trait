@@ -108,24 +108,32 @@ macro_rules! signed_parsable {
 signed_parsable!(i8 i16 i32 i64 i128);
 
 macro_rules! floating_parsable {
-    ($($ty:ty => $fn:tt),+) => {
+    ($($ty:tt)+) => {
         $(
         impl<I, E: error::ParseError<I>> ParseFrom<I, E> for $ty
         where
-            I: Input + Offset + AsBytes + ParseTo<$ty> + Compare<&'static str>,
+            I: Input + Offset + AsBytes + Compare<&'static str>,
             <I as Input>::Item: AsChar,
             <I as Input>::Iter: Clone,
             I: for<'a> Compare<&'a [u8]>,
         {
             fn parse(input: I) -> nom::IResult<I, Self, E> {
-                nom::number::complete::$fn(input)
+                use std::str::FromStr;
+                use nom::number::complete::recognize_float_or_exceptions;
+                use std::str::from_utf8;
+
+                let (i, s) = recognize_float_or_exceptions(input)?;
+                match from_utf8(s.as_bytes()).ok().and_then(|s| $ty::from_str(s).ok()) {
+                    Some(f) => Ok((i, f)),
+                    None => Err(nom::Err::Error(E::from_error_kind(i, nom::error::ErrorKind::Float))),
+                }
             }
         }
         )*
     }
 }
 
-floating_parsable!(f32 => float, f64 => double);
+floating_parsable!(f32 f64);
 
 /// Support reading the words "true" or "false" from the input and interpreting them as boolean values.
 impl<I, E: error::ParseError<I>> ParseFrom<I, E> for bool

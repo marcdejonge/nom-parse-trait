@@ -152,11 +152,11 @@ where
     <I as Input>::Item: AsChar,
 {
     fn parse(input: I) -> IResult<I, Self, E> {
-        if input.input_len() == 0 {
-            return Err(Err::Error(E::from_error_kind(input, error::ErrorKind::Eof)));
-        }
-
-        let char = input.iter_elements().next().unwrap().as_char();
+        let char = input
+            .iter_elements()
+            .next()
+            .ok_or_else(|| Err::Error(E::from_error_kind(input.clone(), error::ErrorKind::Eof)))?
+            .as_char();
         let (rest, _) = input.take_split(char.len());
         Ok((rest, char))
     }
@@ -166,23 +166,22 @@ where
 impl<I, E: error::ParseError<I>> ParseFrom<I, E> for u8
 where
     I: Input,
-    <I as Input>::Item: AsChar,
+    <I as Input>::Item: AsBytes,
 {
     fn parse(input: I) -> IResult<I, Self, E> {
-        if input.input_len() == 0 {
-            return Err(Err::Error(E::from_error_kind(input, error::ErrorKind::Eof)));
-        }
-
-        let char = input.iter_elements().next().unwrap().as_char();
-        if char.len() != 1 {
+        let item = input
+            .iter_elements()
+            .next()
+            .ok_or_else(|| Err::Error(E::from_error_kind(input.clone(), error::ErrorKind::Eof)))?;
+        let bytes = item.as_bytes();
+        if bytes.len() != 1 {
             return Err(Err::Error(E::from_error_kind(
                 input,
                 error::ErrorKind::Char,
             )));
         }
-
-        let (rest, _) = input.take_split(1);
-        Ok((rest, char as u8))
+        let (rest, _) = input.take_split(bytes.len());
+        Ok((rest, bytes[0]))
     }
 }
 
@@ -233,6 +232,44 @@ where
             |list| list.into_iter().collect(),
         )
         .parse(input)
+    }
+}
+
+impl<const N: usize, I, E: error::ParseError<I>, T: ParseFrom<I, E>> ParseFrom<I, E> for [T; N]
+where
+    I: Input + Compare<&'static str>,
+    <I as Input>::Item: AsChar + Copy,
+{
+    fn parse(mut input: I) -> IResult<I, Self, E> {
+        use std::mem::*;
+        let mut arr: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
+        if N > 0 {
+            let mut separator = (space0, tag::<_, I, E>(","), space0);
+
+            let (rest, value) = T::parse(input)?;
+            arr[0].write(value);
+            input = rest;
+
+            for i in 1..N {
+                match separator.parse(input).map(|(rest, _)| T::parse(rest)) {
+                    Ok(Ok((rest, value))) => {
+                        arr[i].write(value);
+                        input = rest;
+                    }
+                    Ok(Err(e)) | Err(e) => {
+                        // There was an error parsing the separator or the value
+                        // We need to clean up the already initialized elements
+                        for j in 0..i {
+                            unsafe {
+                                arr[j].assume_init_drop();
+                            }
+                        }
+                        return Err(e);
+                    }
+                }
+            }
+        }
+        Ok((input, arr.map(|x| unsafe { x.assume_init() })))
     }
 }
 
@@ -357,6 +394,28 @@ mod tests {
             assert_eq!(
                 Ok::<_, Error<_>>(expected),
                 HashMap::<char, u32>::parse_complete(input)
+            );
+        }
+
+        #[test]
+        fn test_array_of_numbers() {
+            let input = "1, 2, 3, 4, 5";
+            let expected = [1, 2, 3, 4, 5];
+
+            assert_eq!(
+                Ok::<_, Error<_>>(expected),
+                <[u32; 5]>::parse_complete(input)
+            )
+        }
+
+        #[test]
+        fn test_empty_array_of_numbers() {
+            let input = "";
+            let expected: [u32; 0] = [];
+
+            assert_eq!(
+                Ok::<_, Error<_>>(expected),
+                <[u32; 0]>::parse_complete(input)
             );
         }
     }

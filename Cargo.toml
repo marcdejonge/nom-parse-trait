@@ -1,7 +1,7 @@
 [package]
 name = "nom-parse-trait"
 description = "Adding traits to make parsing types easier"
-version = "0.3.2"
+version = "0.4.0"
 license = "MIT/Apache-2.0"
 keywords = ["nom", "parser", "parsable"]
 categories = ["parsing"]

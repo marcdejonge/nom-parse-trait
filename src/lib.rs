@@ -70,6 +70,28 @@ where
     }
 }
 
+macro_rules! wrapper_types {
+    ($($ty:ty),+) => {
+        $(
+            impl<I, E: error::ParseError<I>, T: ParseFrom<I, E>> ParseFrom<I, E> for $ty {
+                fn parse(input: I) -> IResult<I, Self, E> {
+                    combinator::map(T::parse, |val| Self::new(val)).parse(input)
+                }
+            }
+        )*
+    }
+}
+
+wrapper_types!(
+    Box<T>,
+    std::cell::Cell<T>,
+    std::cell::RefCell<T>,
+    std::rc::Rc<T>,
+    std::sync::Arc<T>,
+    std::sync::Mutex<T>,
+    std::sync::RwLock<T>
+);
+
 macro_rules! unsigned_parsable {
     ($($ty:tt)+) => {
         $(
@@ -259,10 +281,8 @@ where
                     Ok(Err(e)) | Err(e) => {
                         // There was an error parsing the separator or the value
                         // We need to clean up the already initialized elements
-                        for j in 0..i {
-                            unsafe {
-                                arr[j].assume_init_drop();
-                            }
+                        unsafe {
+                            arr[0..i].iter_mut().for_each(|it| it.assume_init_drop());
                         }
                         return Err(e);
                     }
@@ -417,6 +437,46 @@ mod tests {
                 Ok::<_, Error<_>>(expected),
                 <[u32; 0]>::parse_complete(input)
             );
+        }
+    }
+
+    mod wrapping {
+        use std::{rc::Rc, sync::Arc};
+
+        use crate::*;
+        use nom::error::*;
+
+        #[test]
+        fn test_box() {
+            let input = "12";
+            let expected = Box::new(12i32);
+
+            assert_eq!(
+                Ok::<_, Error<_>>(expected),
+                Box::<i32>::parse_complete(input)
+            )
+        }
+
+        #[test]
+        fn test_rc() {
+            let input = "12";
+            let expected = Rc::new(12i32);
+
+            assert_eq!(
+                Ok::<_, Error<_>>(expected),
+                Rc::<i32>::parse_complete(input)
+            )
+        }
+
+        #[test]
+        fn test_arc() {
+            let input = "12";
+            let expected = Arc::new(12i32);
+
+            assert_eq!(
+                Ok::<_, Error<_>>(expected),
+                Arc::<i32>::parse_complete(input)
+            )
         }
     }
 }

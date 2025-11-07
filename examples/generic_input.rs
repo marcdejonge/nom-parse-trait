@@ -13,7 +13,7 @@ where
     <I as Input>::Item: AsChar,
 {
     fn parse(input: I) -> IResult<I, Self, E> {
-        map(separated_list1(space1, u32::parse), |v| Numbers(v)).parse(input)
+        map(separated_list1(space1, u32::parse), Numbers).parse(input)
     }
 }
 

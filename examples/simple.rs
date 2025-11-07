@@ -8,13 +8,18 @@ struct Numbers(Vec<u32>);
 
 impl<'a> ParseFrom<&'a str> for Numbers {
     fn parse(input: &'a str) -> IResult<&'a str, Self> {
-        map(separated_list1(space1, u32::parse), |v| Numbers(v)).parse(input)
+        map(separated_list1(space1, u32::parse), Numbers).parse(input)
     }
 }
 
 fn main() {
     let input = "1 2 3 4 5";
     if let Ok(numbers) = Numbers::parse_complete(input) {
+        println!("Parsed \"{}\" into {:?}", input, numbers.0);
+    }
+
+    // We can also support standard implemented ParseFrom implementations to get wrapped versions
+    if let Ok(numbers) = Box::<Numbers>::parse_complete(input) {
         println!("Parsed \"{}\" into {:?}", input, numbers.0);
     }
 }
